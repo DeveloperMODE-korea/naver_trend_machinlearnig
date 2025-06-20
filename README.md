@@ -1,0 +1,205 @@
+# 네이버 쇼핑 트렌드 머신러닝 분석 시스템 🛍️
+
+## 개요
+네이버 쇼핑 검색 트렌드 데이터를 수집하고 머신러닝을 활용하여 미래 트렌드를 예측하는 시스템입니다.
+
+### 주요 개선사항
+- ✅ **구글 코랩 의존성 제거**: 로컬 환경에서 완전 독립 실행
+- ✅ **AMD GPU 지원**: CPU 및 AMD GPU 환경 최적화
+- ✅ **모듈화 구조**: 1500+ 줄 코드를 6개 모듈로 분리
+- ✅ **향상된 사용성**: 직관적인 메뉴와 에러 처리
+
+## 시스템 요구사항
+
+### 환경
+- **Python 3.8+** (권장: 3.11)
+- **Windows 10/11** (현재 AMD GPU 최적화)
+- **RAM**: 최소 8GB (권장: 16GB)
+
+### GPU 지원
+- **CPU 모드**: 모든 환경에서 동작
+- **AMD GPU**: ROCm 지원 (선택사항)
+- **NVIDIA GPU**: CUDA 지원 (추후 업데이트 예정)
+
+## 설치 방법
+
+### 1. 저장소 복제 및 이동
+```bash
+cd "네이버 쇼핑트렌드 머신러닝"
+```
+
+### 2. 가상환경 생성 및 활성화
+```bash
+python -m venv venv
+venv\Scripts\activate  # Windows
+```
+
+### 3. 패키지 설치
+```bash
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+## 사용 방법
+
+### 기본 실행 (전체 프로세스)
+```bash
+python main_new.py
+```
+
+### 고급 사용자 메뉴
+```bash
+python main_new.py --menu
+```
+
+### 메뉴 옵션
+1. **데이터 수집만 실행** - 네이버 API를 통한 데이터 수집
+2. **데이터 분석만 실행** - 기존 데이터의 통계 분석 및 시각화
+3. **머신러닝 예측만 실행** - Prophet, LSTM 등을 활용한 예측
+4. **전체 실행** - 모든 단계를 순차적으로 실행
+5. **설정 확인** - 현재 시스템 설정 확인
+
+## 프로젝트 구조
+
+```
+네이버 쇼핑트렌드 머신러닝/
+├── main_new.py          # 메인 실행 파일
+├── config.py            # 설정 및 상수 관리
+├── data_collector.py    # 네이버 API 데이터 수집
+├── data_analyzer.py     # 데이터 분석 및 시각화
+├── ml_models.py         # 머신러닝 모델 (Prophet, LSTM)
+├── utils.py             # 유틸리티 함수
+├── requirements.txt     # 필요 패키지 목록
+├── README.md           # 프로젝트 설명서
+├── venv/               # 가상환경
+└── results/            # 결과 파일 저장소
+    ├── models/         # 훈련된 모델 파일
+    ├── plots/          # 생성된 그래프 이미지
+    └── *.csv           # 분석 결과 데이터
+```
+
+## 주요 기능
+
+### 📊 데이터 수집
+- 네이버 쇼핑 검색 트렌드 API 연동
+- 키워드별 월간 검색 비율 수집
+- 기존 데이터 재사용 및 증분 업데이트
+
+### 📈 데이터 분석
+- **기본 통계 분석**: 키워드별 평균, 표준편차, 성장률
+- **상관관계 분석**: 키워드 간 상관관계 히트맵
+- **시계열 분석**: 추세, 계절성, 잔차 분해
+- **시각화**: 트렌드 그래프, 박스플롯, 히트맵
+
+### 🤖 머신러닝 예측
+- **Prophet**: 시계열 예측 (Facebook Prophet)
+- **LSTM**: 딥러닝 순환 신경망
+- **앙상블**: 여러 모델의 가중평균 예측
+- **신뢰구간**: 예측 불확실성 표시
+
+## API 설정
+
+### 네이버 개발자 센터
+1. [네이버 개발자 센터](https://developers.naver.com/) 접속
+2. 애플리케이션 등록 및 데이터랩 API 신청
+3. Client ID와 Client Secret 확보
+4. 프로그램 실행 시 입력
+
+## 결과 파일
+
+### CSV 파일
+- `naver_shopping_data_extended.csv`: 전체 수집 데이터
+- `basic_statistics.csv`: 기본 통계 결과
+- `correlation_matrix.csv`: 상관관계 행렬
+- `growth_rate_analysis.csv`: 성장률 분석 결과
+
+### 이미지 파일
+- `overall_trend.png`: 전체 키워드 트렌드
+- `correlation_heatmap.png`: 상관관계 히트맵
+- `monthly_heatmap.png`: 월별 인기도 히트맵
+- `*_prediction.png`: 키워드별 예측 결과
+
+### 모델 파일
+- `*_prophet_model.json`: Prophet 모델
+- `*_lstm_model.keras`: LSTM 모델
+
+## 성능 최적화
+
+### CPU 모드 (권장)
+```python
+# config.py에서 설정
+LSTM_EPOCHS = 50      # 빠른 실행
+LSTM_BATCH_SIZE = 8   # 메모리 효율성
+```
+
+### GPU 가속 (선택사항)
+AMD GPU 사용 시 ROCm 설치:
+```bash
+pip install tensorflow-rocm
+```
+
+## 문제 해결
+
+### 일반적인 오류
+
+#### 1. 모듈 import 오류
+```bash
+# 가상환경 활성화 확인
+venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+#### 2. 한글 폰트 오류
+- Windows: 자동으로 'Malgun Gothic' 설정
+- 문제 지속 시 시스템 폰트 확인
+
+#### 3. 메모리 부족
+```python
+# config.py에서 배치 사이즈 조정
+LSTM_BATCH_SIZE = 4  # 기본값 8에서 감소
+```
+
+#### 4. API 오류
+- 네이버 API 키 재확인
+- 요청 한도 확인 (일일 1,000회)
+- 네트워크 연결 상태 확인
+
+### 로그 및 디버깅
+```bash
+# 상세 오류 정보 확인
+python main_new.py --menu
+# 개별 모듈 테스트
+```
+
+## 기여 방법
+
+### 버그 리포트
+1. 오류 상황 및 환경 정보 제공
+2. 재현 가능한 최소 코드 예제
+3. 예상 결과 vs 실제 결과
+
+### 기능 요청
+1. 구체적인 사용 사례 설명
+2. 예상되는 구현 방법
+3. 기존 기능과의 호환성 고려
+
+## 라이선스
+MIT License - 자유롭게 사용, 수정, 배포 가능
+
+## 지원 및 문의
+- **이슈 제기**: GitHub Issues 활용
+- **업데이트**: 정기적으로 새 기능 및 최적화 제공
+
+---
+
+### 변경 이력
+- **v2.0** (2024): 로컬 환경 최적화, 모듈화 구조
+- **v1.0** (2024): 초기 구글 코랩 버전
+
+### 다음 업데이트 예정
+- 🔄 NVIDIA GPU 지원 확대
+- 📱 웹 UI 인터페이스
+- 🔍 더 많은 ML 모델 추가
+- 📊 대시보드 기능
+
+**즐거운 데이터 분석 되세요! 🚀** 
