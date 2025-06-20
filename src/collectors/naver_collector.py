@@ -2,9 +2,11 @@ import requests
 import json
 import pandas as pd
 import time
+import os
 from datetime import datetime
-from config import Config
-from utils import get_user_input, save_file, load_file
+from ..config import Config
+from ..utils.common_utils import CommonUtils
+from ..utils.file_utils import FileManager
 
 class NaverDataCollector:
     """네이버 쇼핑 검색 트렌드 데이터 수집 클래스"""
@@ -21,8 +23,8 @@ class NaverDataCollector:
     def setup_credentials(self):
         """API 인증 정보를 설정합니다"""
         print("네이버 API 인증 정보를 입력해주세요.")
-        self.client_id = get_user_input("네이버 API client_id를 입력하세요")
-        self.client_secret = get_user_input("네이버 API client_secret을 입력하세요")
+        self.client_id = CommonUtils.get_user_input("네이버 API client_id를 입력하세요")
+        self.client_secret = CommonUtils.get_user_input("네이버 API client_secret을 입력하세요")
         self.setup_headers()
     
     def setup_headers(self):
@@ -38,7 +40,7 @@ class NaverDataCollector:
         print("분석할 키워드를 입력해주세요. 쉼표(,)로 구분하여 입력하세요.")
         print("예시: 물티슈, 기저귀, 커피, 마스크, 생수")
         
-        user_input = get_user_input("키워드 입력")
+        user_input = CommonUtils.get_user_input("키워드 입력")
         keywords = [keyword.strip() for keyword in user_input.split(',')]
         
         # 키워드 개수 제한
@@ -54,20 +56,18 @@ class NaverDataCollector:
     
     def get_date_range_from_user(self):
         """사용자로부터 날짜 범위를 입력받습니다"""
-        start_year = get_user_input("분석 시작 연도를 입력하세요", 2017, int)
-        end_year = get_user_input("분석 종료 연도를 입력하세요", 2024, int)
+        start_year = CommonUtils.get_user_input("분석 시작 연도를 입력하세요", 2017, int)
+        end_year = CommonUtils.get_user_input("분석 종료 연도를 입력하세요", 2024, int)
         return start_year, end_year
     
     def check_saved_data(self, keywords):
         """저장된 데이터가 있는지 확인합니다"""
-        saved_data_path = Config.DATA_FILE
-        
         try:
-            result_df = load_file(saved_data_path)
+            result_df = FileManager.load_file(Config.DATA_FILE)
             if result_df is not None and not result_df.empty:
                 print(f"이전에 저장된 데이터가 발견되었습니다.")
                 
-                use_saved = get_user_input("이 데이터를 사용하시겠습니까?", "y", bool)
+                use_saved = CommonUtils.get_user_input("이 데이터를 사용하시겠습니까?", "y", bool)
                 
                 if use_saved:
                     saved_keywords = result_df['keyword'].unique()
@@ -76,7 +76,7 @@ class NaverDataCollector:
                     new_keywords = [k for k in keywords if k not in saved_keywords]
                     if new_keywords:
                         print(f"새로운 키워드 발견: {', '.join(new_keywords)}")
-                        collect_new = get_user_input("새 키워드에 대한 데이터를 수집하시겠습니까?", "y", bool)
+                        collect_new = CommonUtils.get_user_input("새 키워드에 대한 데이터를 수집하시겠습니까?", "y", bool)
                         return result_df, new_keywords if collect_new else []
                     
                     return result_df, []
@@ -182,7 +182,7 @@ class NaverDataCollector:
                 for keyword in keywords:
                     total_requests += 1
                     
-                    # 기존 데이터에 이미 있는지 확인 (빈 DataFrame인 경우 건너뛰기)
+                    # 기존 데이터에 이미 있는지 확인
                     if not result_df.empty and 'year' in result_df.columns:
                         existing_data = result_df[
                             (result_df['year'] == year) & 
@@ -224,7 +224,7 @@ class NaverDataCollector:
             result_df = result_df.sort_values(by=['keyword', 'date'])
             
             # 데이터 저장
-            save_file(result_df, Config.DATA_FILE)
+            FileManager.save_file(result_df, Config.DATA_FILE)
             
             print(f"수집된 데이터: {len(result_df)}개 행")
             print(f"키워드별 데이터 개수:")
@@ -233,5 +233,3 @@ class NaverDataCollector:
                 print(f"  {keyword}: {count}개")
         
         return result_df 
-
- 

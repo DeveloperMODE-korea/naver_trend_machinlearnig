@@ -11,6 +11,7 @@
 
 import sys
 import traceback
+import pandas as pd
 from config import Config
 from data_collector import NaverDataCollector
 from data_analyzer import DataAnalyzer
@@ -33,33 +34,95 @@ def main():
         
         # 2. 데이터 수집
         print("\n2️⃣  데이터 수집 모듈")
-        collector = NaverDataCollector()
         
-        # API 인증 정보 설정
-        collector.setup_credentials()
+        # 플랫폼 선택
+        print("\n📊 데이터 플랫폼 선택:")
+        print("1. 네이버 쇼핑 트렌드만")
+        print("2. 구글 트렌드만") 
+        print("3. 네이버 + 구글 트렌드 (통합 분석)")
         
-        # 키워드 입력
+        platform_choice = get_user_input("플랫폼을 선택하세요 (1-3)", "1")
+        
+        # 키워드 입력 (공통)
+        collector = NaverDataCollector()  # 키워드 입력용
         keywords = collector.get_keywords_from_user()
-        
-        # 날짜 범위 입력
         start_year, end_year = collector.get_date_range_from_user()
         
-        # 저장된 데이터 확인
-        existing_df, keywords_to_collect = collector.check_saved_data(keywords)
-        
-        # 데이터 수집 실행
-        if keywords_to_collect:
-            print(f"\n새로운 데이터 수집: {', '.join(keywords_to_collect)}")
-            result_df = collector.collect_data(keywords_to_collect, start_year, end_year, existing_df)
+        if platform_choice == "1":
+            # 네이버만
+            print("\n📊 네이버 쇼핑 트렌드 데이터 수집...")
+            collector.setup_credentials()
+            existing_df, keywords_to_collect = collector.check_saved_data(keywords)
+            
+            if keywords_to_collect:
+                print(f"\n새로운 데이터 수집: {', '.join(keywords_to_collect)}")
+                result_df = collector.collect_data(keywords_to_collect, start_year, end_year, existing_df)
+            else:
+                result_df = existing_df
+                print("\n기존 데이터를 사용합니다.")
+            
+        elif platform_choice == "2":
+            # 구글 트렌드만
+            print("\n🌐 구글 트렌드 데이터 수집...")
+            from data_collector import GoogleTrendsCollector
+            google_collector = GoogleTrendsCollector()
+            result_df = google_collector.collect_trends_data(keywords, start_year, end_year)
+            
+        elif platform_choice == "3":
+            # 통합 수집
+            print("\n🔄 다중 플랫폼 데이터 수집...")
+            from data_collector import MultiPlatformCollector
+            
+            # 네이버 API 인증
+            collector.setup_credentials()
+            
+            # 다중 플랫폼 수집기 초기화
+            multi_collector = MultiPlatformCollector(collector.client_id, collector.client_secret)
+            
+            # 플랫폼 선택
+            platforms = ['naver', 'google']
+            use_existing = get_user_input("기존 네이버 데이터를 활용하시겠습니까?", "y", bool)
+            
+            if use_existing:
+                existing_df, keywords_to_collect = collector.check_saved_data(keywords)
+                if not existing_df.empty:
+                    print("기존 네이버 데이터를 로드했습니다.")
+                    # 구글 데이터만 추가 수집
+                    from data_collector import GoogleTrendsCollector
+                    google_collector = GoogleTrendsCollector()
+                    google_data = google_collector.collect_trends_data(keywords, start_year, end_year)
+                    
+                    if not google_data.empty:
+                        existing_df['source'] = 'naver'  # 기존 데이터에 소스 추가
+                        result_df = pd.concat([existing_df, google_data], ignore_index=True)
+                        print(f"✅ 다중 플랫폼 데이터 통합 완료: {len(result_df)}개 포인트")
+                    else:
+                        result_df = existing_df
+                        result_df['source'] = 'naver'
+                else:
+                    result_df = multi_collector.collect_multi_platform_data(keywords, start_year, end_year, platforms)
+            else:
+                result_df = multi_collector.collect_multi_platform_data(keywords, start_year, end_year, platforms)
         else:
-            result_df = existing_df
-            print("\n기존 데이터를 사용합니다.")
+            print("❌ 잘못된 선택입니다. 네이버 데이터를 사용합니다.")
+            collector.setup_credentials()
+            existing_df, keywords_to_collect = collector.check_saved_data(keywords)
+            result_df = collector.collect_data(keywords_to_collect, start_year, end_year, existing_df)
         
         if result_df.empty:
             print("❌ 수집된 데이터가 없습니다. 프로그램을 종료합니다.")
             return
         
         print(f"✅ 데이터 준비 완료: {len(result_df)}개 데이터 포인트")
+        
+        # 플랫폼 정보 출력
+        if 'source' in result_df.columns:
+            platform_counts = result_df['source'].value_counts()
+            print("플랫폼별 데이터 분포:")
+            for platform, count in platform_counts.items():
+                print(f"  {platform}: {count}개")
+        else:
+            print("플랫폼: 네이버 쇼핑 트렌드")
         
         # 3. 데이터 분석
         print("\n3️⃣  데이터 분석 모듈")
@@ -82,10 +145,49 @@ def main():
             
             print(f"사용 가능한 키워드: {', '.join(available_keywords)}")
             
-            prediction_results = trainer.run_predictions(
-                keywords=available_keywords, 
-                max_keywords=max_keywords
-            )
+            # 예측 방법 선택 (다중 플랫폼 자동 감지)
+            if 'source' in result_df.columns and len(result_df['source'].unique()) > 1:
+                print("다중 플랫폼 데이터가 감지되었습니다.")
+                use_multi_platform = get_user_input("다중 플랫폼 통합 예측을 사용하시겠습니까?", "y", bool)
+                
+                if use_multi_platform:
+                    prediction_results = trainer.run_multi_platform_predictions(
+                        keywords=available_keywords, 
+                        max_keywords=max_keywords
+                    )
+                else:
+                    # 단일 플랫폼별 예측
+                    platform_choice = get_user_input(f"예측에 사용할 플랫폼을 선택하세요 ({'/'.join(result_df['source'].unique())})", 
+                                                   result_df['source'].unique()[0])
+                    
+                    platform_data = result_df[result_df['source'] == platform_choice].drop(columns=['source'])
+                    trainer_single = MLModelTrainer(platform_data)
+                    
+                    use_enhanced = get_user_input("개선된 예측 방법을 사용하시겠습니까?", "y", bool)
+                    if use_enhanced:
+                        prediction_results = trainer_single.run_predictions_enhanced(
+                            keywords=available_keywords, 
+                            max_keywords=max_keywords
+                        )
+                    else:
+                        prediction_results = trainer_single.run_predictions(
+                            keywords=available_keywords, 
+                            max_keywords=max_keywords
+                        )
+            else:
+                # 단일 플랫폼 데이터
+                use_enhanced = get_user_input("개선된 예측 방법을 사용하시겠습니까? (범위 제약, 정규화 등 적용)", "y", bool)
+                
+                if use_enhanced:
+                    prediction_results = trainer.run_predictions_enhanced(
+                        keywords=available_keywords, 
+                        max_keywords=max_keywords
+                    )
+                else:
+                    prediction_results = trainer.run_predictions(
+                        keywords=available_keywords, 
+                        max_keywords=max_keywords
+                    )
             
             if prediction_results:
                 print(f"\n✅ {len(prediction_results)}개 키워드 예측 완료!")
@@ -125,12 +227,65 @@ def show_menu():
     print("2. 데이터 분석만 실행")
     print("3. 머신러닝 예측만 실행")
     print("4. 전체 실행 (권장)")
-    print("5. 설정 확인")
-    print("6. 종료")
+    print("5. 웹 대시보드 실행 (NEW!)")
+    print("6. 설정 확인")
+    print("7. 종료")
     print("-" * 60)
     
-    choice = get_user_input("선택하세요 (1-6)", "4")
+    choice = get_user_input("선택하세요 (1-7)", "4")
     return choice
+
+def run_web_dashboard():
+    """웹 대시보드 실행"""
+    print("\n" + "=" * 60)
+    print("🌐 웹 대시보드 시작")
+    print("=" * 60)
+    
+    try:
+        import streamlit
+        print("✅ Streamlit 패키지 확인됨")
+    except ImportError:
+        print("❌ Streamlit가 설치되지 않았습니다.")
+        install = get_user_input("지금 설치하시겠습니까?", "y", bool)
+        if install:
+            import subprocess
+            subprocess.run([sys.executable, "-m", "pip", "install", "streamlit"])
+            print("✅ Streamlit 설치 완료")
+        else:
+            print("웹 대시보드 실행을 취소합니다.")
+            return
+    
+    print("\n🚀 웹 대시보드를 시작합니다...")
+    print("📱 브라우저에서 http://localhost:8501 을 열어주세요.")
+    print("⏹️  중단하려면 터미널에서 Ctrl+C를 누르세요.")
+    print("-" * 60)
+    
+    try:
+        import subprocess
+        import os
+        
+        # Streamlit 앱 실행
+        cmd = [
+            sys.executable, "-m", "streamlit", "run", "streamlit_app.py",
+            "--server.port", "8501",
+            "--server.address", "localhost"
+        ]
+        
+        process = subprocess.Popen(cmd)
+        
+        print("웹 대시보드가 실행 중입니다...")
+        print("메뉴로 돌아가려면 브라우저를 닫고 여기서 Ctrl+C를 누르세요.")
+        
+        # 프로세스 대기
+        process.wait()
+        
+    except KeyboardInterrupt:
+        print("\n웹 대시보드를 종료합니다.")
+        if 'process' in locals():
+            process.terminate()
+    except Exception as e:
+        print(f"웹 대시보드 실행 중 오류: {e}")
+        print("수동으로 실행하려면: streamlit run streamlit_app.py")
 
 def run_individual_modules():
     """개별 모듈 실행"""
@@ -186,6 +341,10 @@ def run_individual_modules():
             break
             
         elif choice == "5":
+            # 웹 대시보드 실행
+            run_web_dashboard()
+            
+        elif choice == "6":
             # 설정 확인
             print(f"\n📋 현재 설정:")
             print(f"   저장 디렉토리: {Config.SAVE_DIR}")
@@ -193,7 +352,7 @@ def run_individual_modules():
             print(f"   시각화 DPI: {Config.DPI}")
             print(f"   LSTM 에포크: {Config.LSTM_EPOCHS}")
             
-        elif choice == "6":
+        elif choice == "7":
             print("👋 프로그램을 종료합니다.")
             break
             
@@ -202,8 +361,20 @@ def run_individual_modules():
 
 if __name__ == "__main__":
     try:
-        if len(sys.argv) > 1 and sys.argv[1] == "--menu":
-            run_individual_modules()
+        if len(sys.argv) > 1:
+            if sys.argv[1] == "--menu":
+                run_individual_modules()
+            elif sys.argv[1] == "--web" or sys.argv[1] == "--dashboard":
+                run_web_dashboard()
+            elif sys.argv[1] == "--help" or sys.argv[1] == "-h":
+                print("\n사용법:")
+                print("  python main_new.py           # 기본 전체 실행")
+                print("  python main_new.py --menu    # 고급 메뉴")
+                print("  python main_new.py --web     # 웹 대시보드 실행")
+                print("  python main_new.py --help    # 도움말")
+            else:
+                print(f"알 수 없는 옵션: {sys.argv[1]}")
+                print("python main_new.py --help 로 사용법을 확인하세요.")
         else:
             main()
     except Exception as e:

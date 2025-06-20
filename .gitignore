@@ -73,4 +73,8 @@ checkpoints/
 # API Keys (보안상 중요)
 config.txt
 api_keys.txt
-credentials.json 
+credentials.json
+
+# Streamlit
+.streamlit/secrets.toml
+streamlit_cache/ 
