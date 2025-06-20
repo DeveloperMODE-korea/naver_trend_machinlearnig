@@ -3,7 +3,7 @@
 ## 개요
 네이버 쇼핑 검색 트렌드 데이터를 수집하고 머신러닝을 활용하여 미래 트렌드를 예측하는 시스템입니다.
 
-### 이미지
+## 이미지
 ![image](https://github.com/user-attachments/assets/5e5849e7-cd18-4647-ad43-a2648d3db034)
 
 
