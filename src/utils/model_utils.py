@@ -39,6 +39,18 @@ class ModelManager:
                 model_path = os.path.join(save_dir, f"{keyword_safe}_{model_type}_model.keras")
                 model.save(model_path, save_format='keras')
                 print(f"{keyword}의 {model_type.upper()} 모델이 저장되었습니다: {model_path}")
+                
+            elif model_type == "transformer":
+                import torch
+                model_path = os.path.join(save_dir, f"{keyword_safe}_{model_type}_model.pth")
+                torch.save(model.state_dict(), model_path)
+                print(f"{keyword}의 Transformer 모델이 저장되었습니다: {model_path}")
+                
+            elif model_type in ["xgboost", "catboost"]:
+                model_path = os.path.join(save_dir, f"{keyword_safe}_{model_type}_model.pkl")
+                joblib.dump(model, model_path)
+                print(f"{keyword}의 {model_type.upper()} 모델이 저장되었습니다: {model_path}")
+                
             else:
                 raise ValueError(f"지원되지 않는 모델 유형: {model_type}")
             return True
@@ -80,8 +92,43 @@ class ModelManager:
                 else:
                     return None
                 print(f"{keyword}의 {model_type.upper()} 모델을 로드했습니다")
+                
+            elif model_type == "transformer":
+                import torch
+                from ..models.transformer_model import TimeSeriesTransformer
+                
+                model_path = os.path.join(save_dir, f"{keyword_safe}_{model_type}_model.pth")
+                if not os.path.exists(model_path):
+                    return None
+                
+                # 기본 파라미터로 모델 생성 후 가중치 로드
+                d_model = 64
+                nhead = 8
+                if d_model % nhead != 0:
+                    d_model = ((d_model // nhead) + 1) * nhead
+                    
+                model = TimeSeriesTransformer(
+                    input_dim=1,
+                    d_model=d_model,
+                    nhead=nhead,
+                    num_layers=4,
+                    seq_len=12,
+                    pred_len=6
+                )
+                model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+                print(f"{keyword}의 Transformer 모델을 로드했습니다")
+                
+            elif model_type in ["xgboost", "catboost"]:
+                model_path = os.path.join(save_dir, f"{keyword_safe}_{model_type}_model.pkl")
+                if not os.path.exists(model_path):
+                    return None
+                model = joblib.load(model_path)
+                print(f"{keyword}의 {model_type.upper()} 모델을 로드했습니다")
+                
             else:
-                raise ValueError(f"지원되지 않는 모델 유형: {model_type}")
+                # 지원되지 않는 모델 타입은 None 반환 (오류 발생하지 않도록)
+                return None
+                
             return model
         except Exception as e:
             print(f"{keyword}의 {model_type} 모델 로드 중 오류: {e}")

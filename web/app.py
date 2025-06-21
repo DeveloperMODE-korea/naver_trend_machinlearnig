@@ -296,18 +296,195 @@ def show_data_analysis_page():
     
     st.success(f"분석 데이터: {len(data_df)}개 포인트, {len(data_df['keyword'].unique())}개 키워드")
     
+    # 분석 옵션
+    col1, col2 = st.columns(2)
+    with col1:
+        show_charts = st.checkbox("📊 차트 생성 및 표시", value=True)
+        show_tables = st.checkbox("📋 분석 결과 테이블", value=True)
+    
+    with col2:
+        show_interactive = st.checkbox("🔄 인터랙티브 차트", value=True)
+        show_images = st.checkbox("🖼️ 저장된 이미지 표시", value=True)
+    
     # 분석 실행
     if st.button("🔍 전체 분석 시작", type="primary"):
         with st.spinner("분석 중..."):
             try:
                 # 모듈화된 분석기 사용
                 analyzer = StatisticsAnalyzer(data_df)
-                analyzer.run_full_analysis()
                 
-                st.success("✅ 분석 완료! results 폴더를 확인하세요.")
+                # 기본 통계 분석
+                stats_df, yearly_avg = analyzer.basic_statistics()
+                
+                # 상관관계 분석
+                correlation = analyzer.correlation_analysis()
+                
+                # 성장률 분석
+                growth_df = analyzer.growth_rate_analysis()
+                
+                # 월별 분석
+                monthly_top = analyzer.monthly_analysis()
+                
+                # 다중 플랫폼 분석 (해당되는 경우)
+                analyzer.multi_platform_analysis()
+                
+                st.success("✅ 분석 완료!")
+                
+                # 결과 표시
+                if show_tables:
+                    st.subheader("📊 분석 결과 테이블")
+                    
+                    # 기본 통계
+                    if stats_df is not None:
+                        st.write("**📈 키워드별 기본 통계**")
+                        st.dataframe(stats_df, use_container_width=True)
+                    
+                    # 성장률
+                    if growth_df is not None:
+                        st.write("**📈 키워드별 성장률**")
+                        st.dataframe(growth_df, use_container_width=True)
+                    
+                    # 상관관계
+                    if correlation is not None:
+                        st.write("**🔗 키워드 간 상관관계**")
+                        st.dataframe(correlation, use_container_width=True)
+                
+                # 인터랙티브 차트 생성
+                if show_interactive:
+                    st.subheader("🔄 인터랙티브 차트")
+                    
+                    # 전체 트렌드 차트
+                    if not data_df.empty:
+                        fig_trend = px.line(
+                            data_df, 
+                            x='date', 
+                            y='ratio', 
+                            color='keyword',
+                            title='📈 키워드별 검색 트렌드',
+                            labels={'ratio': '검색 비율', 'date': '날짜'}
+                        )
+                        fig_trend.update_layout(height=500)
+                        st.plotly_chart(fig_trend, use_container_width=True)
+                    
+                    # 상관관계 히트맵
+                    if correlation is not None and not correlation.empty:
+                        fig_corr = px.imshow(
+                            correlation,
+                            text_auto=True,
+                            aspect="auto",
+                            title="🔗 키워드 간 상관관계 히트맵",
+                            color_continuous_scale="RdBu_r"
+                        )
+                        fig_corr.update_layout(height=400)
+                        st.plotly_chart(fig_corr, use_container_width=True)
+                    
+                    # 성장률 바차트
+                    if growth_df is not None and not growth_df.empty:
+                        fig_growth = px.bar(
+                            growth_df,
+                            x='키워드',
+                            y='성장률(%)',
+                            title="📊 키워드별 성장률",
+                            color='성장률(%)',
+                            color_continuous_scale="RdYlGn"
+                        )
+                        fig_growth.update_layout(height=400)
+                        st.plotly_chart(fig_growth, use_container_width=True)
+                    
+                    # 월별 패턴 분석
+                    if not data_df.empty:
+                        monthly_avg = data_df.groupby(['month', 'keyword'])['ratio'].mean().reset_index()
+                        fig_monthly = px.line(
+                            monthly_avg,
+                            x='month',
+                            y='ratio',
+                            color='keyword',
+                            title="📅 월별 평균 검색 비율 (계절성)",
+                            labels={'ratio': '평균 검색 비율', 'month': '월'}
+                        )
+                        fig_monthly.update_layout(height=400)
+                        st.plotly_chart(fig_monthly, use_container_width=True)
+                
+                # 저장된 이미지 표시
+                if show_images:
+                    st.subheader("🖼️ 분석 결과 이미지")
+                    
+                    plot_dir = os.path.join(Config.SAVE_DIR, 'plots')
+                    
+                    if os.path.exists(plot_dir):
+                        # 이미지 파일 목록
+                        image_files = [f for f in os.listdir(plot_dir) if f.endswith('.png')]
+                        
+                        if image_files:
+                            # 이미지를 2열로 표시
+                            cols = st.columns(2)
+                            
+                            for idx, image_file in enumerate(image_files):
+                                image_path = os.path.join(plot_dir, image_file)
+                                
+                                with cols[idx % 2]:
+                                    # 파일명에서 제목 생성
+                                    title = image_file.replace('.png', '').replace('_', ' ').title()
+                                    st.write(f"**{title}**")
+                                    
+                                    try:
+                                        st.image(image_path, use_column_width=True)
+                                    except Exception as e:
+                                        st.error(f"이미지 로드 실패: {image_file}")
+                        else:
+                            st.info("생성된 이미지가 없습니다.")
+                    else:
+                        st.info("plots 폴더가 없습니다.")
+                
+                # 데이터 다운로드 옵션
+                st.subheader("💾 결과 다운로드")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    if stats_df is not None:
+                        csv_stats = stats_df.to_csv(index=False)
+                        st.download_button(
+                            label="📊 기본 통계 CSV",
+                            data=csv_stats,
+                            file_name="basic_statistics.csv",
+                            mime="text/csv"
+                        )
+                
+                with col2:
+                    if correlation is not None:
+                        csv_corr = correlation.to_csv()
+                        st.download_button(
+                            label="🔗 상관관계 CSV",
+                            data=csv_corr,
+                            file_name="correlation_matrix.csv",
+                            mime="text/csv"
+                        )
+                
+                with col3:
+                    if growth_df is not None:
+                        csv_growth = growth_df.to_csv(index=False)
+                        st.download_button(
+                            label="📈 성장률 CSV",
+                            data=csv_growth,
+                            file_name="growth_rate.csv",
+                            mime="text/csv"
+                        )
+                
+                # 세션에 분석 결과 저장 (AI 리포트에서 사용)
+                st.session_state['analysis_results'] = {
+                    'basic_statistics': stats_df,
+                    'correlation_matrix': correlation,
+                    'growth_rates': growth_df,
+                    'monthly_analysis': monthly_top
+                }
+                
+                st.info("💡 분석 결과가 저장되었습니다. 🧠 AI 리포트 페이지에서 전문가 분석을 확인하세요!")
                 
             except Exception as e:
                 st.error(f"분석 중 오류: {str(e)}")
+                import traceback
+                st.error(f"상세 오류: {traceback.format_exc()}")
 
 def show_quality_validation_page():
     """데이터 품질 검증 페이지"""
@@ -603,7 +780,7 @@ def show_ml_prediction_page():
                     for keyword, result in results.items():
                         st.subheader(f"📊 {keyword} 예측 결과")
                         
-                        # 기본 결과 표시
+                        # 기본 결과 표시 (중복 제거)
                         display_columns = ['날짜', '앙상블 예측']
                         
                         if show_confidence_intervals and '신뢰도' in result.columns:
@@ -612,14 +789,20 @@ def show_ml_prediction_page():
                         if 'AutoML 강화 예측' in result.columns:
                             display_columns.append('AutoML 강화 예측')
                         
-                        # 개별 모델 예측값 포함
+                        # 개별 모델 예측값 포함 (중복 제거)
                         if show_individual_models:
-                            model_cols = [col for col in result.columns if '예측' in col and col != '앙상블 예측']
+                            model_cols = [col for col in result.columns 
+                                        if '예측' in col and col not in display_columns]
                             display_columns.extend(model_cols)
                         
-                        # 메타 정보
+                        # 메타 정보 (중복 제거)
                         meta_cols = ['사용된 모델', '주요 모델', 'AutoML 모델']
-                        display_columns.extend([col for col in meta_cols if col in result.columns])
+                        for col in meta_cols:
+                            if col in result.columns and col not in display_columns:
+                                display_columns.append(col)
+                        
+                        # 중복 제거 (최종 안전장치)
+                        display_columns = list(dict.fromkeys(display_columns))
                         
                         # 결과 표시
                         st.dataframe(
@@ -716,7 +899,39 @@ def show_ml_prediction_page():
                     
             except Exception as e:
                 st.error(f"예측 중 오류: {str(e)}")
-                st.error("필요한 패키지가 설치되지 않았을 수 있습니다. requirements.txt를 확인하세요.")
+                
+                # 일반적인 오류 원인과 해결 방법 안내
+                with st.expander("🔧 오류 해결 방법"):
+                    st.markdown("""
+                    **일반적인 오류와 해결 방법:**
+                    
+                    1. **중복 컬럼명 오류**: 페이지를 새로고침하고 다시 시도하세요.
+                    
+                    2. **모델 타입 지원 오류**: 
+                       - Transformer/XGBoost/CatBoost 모델이 실패해도 Prophet+LSTM은 정상 작동합니다.
+                       - 기본 앙상블 모드를 사용해보세요.
+                    
+                    3. **데이터 부족 오류**: 
+                       - 더 많은 키워드 데이터를 수집하거나
+                       - 분석 기간을 늘려보세요.
+                    
+                    4. **텐서 크기 불일치**: 
+                       - Transformer 모델의 알려진 이슈입니다.
+                       - 고급 앙상블에서 Prophet+LSTM만 사용됩니다.
+                    
+                    5. **패키지 설치 문제**: 
+                       ```bash
+                       pip install -r requirements.txt
+                       ```
+                    
+                    **권장사항**: 
+                    - 🔧 기본 앙상블 모드는 항상 안정적으로 작동합니다.
+                    - ⚡ 고급 앙상블은 Prophet+LSTM 조합으로 작동합니다.
+                    """)
+                
+                # 기본 앙상블로 재시도 제안
+                if prediction_mode != "🔧 기본 앙상블":
+                    st.info("💡 문제가 지속되면 '🔧 기본 앙상블' 모드를 시도해보세요. 이 모드는 Prophet+LSTM만 사용하여 안정적으로 작동합니다.")
 
 def show_ai_report_page():
     """AI 리포트 페이지"""
